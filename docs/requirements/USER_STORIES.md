@@ -1,6 +1,6 @@
 # User Stories and Acceptance Criteria
 
-Status: Stage 3 draft for approval  
+Status: Stage 3 approved; USSD deferred under `docs/tags/USSD.md`
 Date: 2026-10-06
 
 ## US-001 — Prepare a trusted circle
@@ -59,6 +59,7 @@ Acceptance criteria:
 3. The user may confirm safety during the allowed window.
 4. An unconfirmed check-in triggers one SOS after the configured grace period.
 5. Confirmation before trigger prevents that automatic incident and is logged.
+6. Authorized administrators can configure reminder and grace-period defaults with audit history.
 
 ## US-006 — Receive and acknowledge an SOS
 
@@ -82,7 +83,8 @@ Acceptance criteria:
 2. Adult members decide separately whether the family head may request location.
 3. Trusted-contact and family-head permissions are shown as different permissions.
 4. Leaving or removal revokes future family access.
-5. Minor accounts are blocked until the governing policy is approved.
+5. A minor joins only through an adult family-head invitation sent by SMS or email and completes onboarding into that family.
+6. Guardian authority and applicable child-consent rules must be verified before the minor's safety permissions become active.
 
 ## US-008 — Request a family member's location
 
@@ -118,8 +120,12 @@ Acceptance criteria:
 3. Location provenance, alert delivery and contact acknowledgements are visible.
 4. Contact attempts, notes, escalation, handoff and closure are audited.
 5. Closure uses an approved reason and verification flow.
+6. A Critical classification immediately notifies the operator and exposes the controlled authority-escalation action.
+7. Non-Critical classifications do not automatically contact authorities.
 
 ## US-011 — Raise SOS through USSD
+
+Status: Deferred; excluded from version 1.
 
 As an authorized caller without access to the user's phone, I want to raise an alert through USSD.
 
@@ -142,3 +148,38 @@ Acceptance criteria:
 4. Status callbacks are authenticated and auditable.
 5. The partner cannot query family locations or search users by phone number.
 
+## US-013 — Configure location frequency
+
+As a user, I want to balance location freshness and battery consumption.
+
+Acceptance criteria:
+
+1. The user selects an allowed preset or update interval for periodic and always-available sharing.
+2. At 25% battery or below, the app recommends a lower-power setting and explains the trade-off.
+3. The setting changes only after the user accepts it, except where the operating system prevents collection.
+4. Every shared location continues to show capture time, freshness and accuracy.
+5. Freshness thresholds are administratively configurable by active safety mode.
+
+## US-015 — Preserve safety evidence without data coverage
+
+As a user in poor coverage, I want the app to preserve and forward the best location evidence it can obtain.
+
+Acceptance criteria:
+
+1. The app distinguishes obtaining a device location from transmitting it to the service.
+2. Timestamped emergency events and location samples are encrypted and queued locally when transmission fails.
+3. The app retries through approved available paths without creating duplicate incidents.
+4. Historical, estimated and current locations are visibly different.
+5. When connectivity returns, queued evidence is synchronized with its original capture time and source.
+
+## US-014 — Configure subscription packages
+
+As an administrator, I want to create packages without releasing a new mobile-app version.
+
+Acceptance criteria:
+
+1. A package can combine features, limits, price, currency and billing period.
+2. A package can be free, paid or have a configurable trial such as 14 or 30 days.
+3. Package versions define how existing subscribers are affected.
+4. The backend enforces entitlements and the apps display the active catalogue.
+5. Package changes are audited.
