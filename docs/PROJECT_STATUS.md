@@ -2,7 +2,7 @@
 
 Date: 2026-10-06
 Branch: `main`
-Commit: `fcb7aca` with approved Stage 4 pending commit
+Commit: `HEAD` (Stage 5 approved baseline; resolve with `git rev-parse HEAD`)
 
 ## Work actually completed
 
@@ -18,6 +18,8 @@ Commit: `fcb7aca` with approved Stage 4 pending commit
 - Founder approved Stage 3 on 2026-10-06, excluding USSD from version 1. USSD is paused and tracked in `docs/tags/USSD.md`.
 - Added the corrected stage-gate rule: founder review and approval must happen before commit or publication.
 - Founder approved the Stage 4 safety-sensitive, high-criticality classification and Senior code-readability engineering profile on 2026-10-06.
+- Founder approved Stage 5: native Kotlin Android, native Swift iPhone, Kotlin/Spring Boot backend, React/Next.js dashboard, Railway hosting and Neon PostgreSQL/PostGIS.
+- Approved incremental deployment of each completed and tested vertical feature slice instead of a big-bang release.
 - No product implementation has been completed.
 
 ## Tests actually executed
@@ -41,8 +43,8 @@ Commit: `fcb7aca` with approved Stage 4 pending commit
 
 ## Next three recommended tasks
 
-1. Complete Technology Selection with evidence for mobile, backend, dashboard, data and infrastructure choices.
-2. Define the 24-hour operating plan and Critical authority-escalation playbook.
-3. Plan controlled location, battery and alert-delivery field trials.
+1. Baseline architecture and engineering standards.
+2. Create deployable repository foundations and connect Railway/Neon after architecture approval.
+3. Define the 24-hour operating plan and controlled location, battery and alert-delivery field trials.
 
 Update this file after every coding task with the date, branch and commit, verified work, tests actually run and results, deployment/demo URL if any, blockers, and the next three tasks. Do not mark untested implementation complete. Consult this file and the relevant product and technical source-of-truth documents before planning implementation.
