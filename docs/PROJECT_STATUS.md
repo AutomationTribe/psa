@@ -2,14 +2,14 @@
 
 Date: 2026-10-07
 Branch: `main`
-Commit: `ad41085` (database/design commit; this status update is uncommitted)
+Commit: local `ad41085`; published on GitHub `main` as `35adaf3`
 
 ## Work actually completed
 
 - Stage 0 idea intake and Stage 1 desk discovery were completed in ChatGPT. The Stage 1 discovery record is now in `docs/discovery/STAGE_1_DISCOVERY.md`.
 - Approved Stage 2 product definition: continuous safety monitoring; trips with or without check-ins; automatic SOS after a missed scheduled check-in; family-head visibility of accepted members' consented locations; family-circle SOS SMS with coordinates and monitoring-dashboard location; Lagos pilot with no fixed participant count; 24-hour monitoring goal; partner API trial after the consumer/monitoring pilot.
 - Created this status handoff and `CLAUDE.md` to require future status updates.
-- Published and verified the current project documentation on GitHub `main`.
+- Published and verified the approved project documentation and database foundation on GitHub `main` in commit `35adaf3`.
 - Drafted Stage 3 functional requirements, user stories with acceptance criteria, non-functional requirements and requirements traceability.
 - Reviewed Stage 3 against the approved product definition, incorporated founder changes and received founder approval.
 - Corrected the delivery framework after Stage 3 was mistakenly published as a draft before founder review; future stages require approval before commit or publication.
@@ -37,6 +37,7 @@ Commit: `ad41085` (database/design commit; this status update is uncommitted)
 
 - No application tests: this repository contains no application code or test suite yet.
 - `git diff --check`: passed after the latest edits.
+- GitHub `main` ref verified at publication commit `35adaf3`; the GitHub API commit contains all 16 approved changed/new files.
 - Static migration checks: 50 unique tables, balanced delimiters, all declared foreign-key targets present; Compose YAML parsed and PostGIS/Flyway service configuration checks passed. These checks do not verify PostgreSQL syntax or execution.
 - Requirements scan: 97 functional requirements and 16 user stories, no duplicate IDs.
 - Docker, Maven and PostgreSQL client/server tools are unavailable in this workspace; migration execution was not run.
@@ -54,12 +55,11 @@ Commit: `ad41085` (database/design commit; this status update is uncommitted)
 - Child-consent verification, separate duress behavior, default freshness values, the detailed Critical escalation playbook and supported device matrix require implementation-stage resolution.
 - USSD is intentionally paused until explicitly resumed through the `USSD` tag.
 - The 24-hour staffing rota, provider agreements and live location/battery/alert field evidence remain unavailable.
-- Commit `ad41085` is local and not pushed. Push failed before reaching GitHub because the configured `browser-proxy:8889` is unavailable. Earlier commits `ca65852` and `e8f12e4` also remain unpublished.
 
 ## Next three recommended tasks
 
 1. Run the migration against disposable Local PostgreSQL/PostGIS using Docker and fix any execution errors.
 2. Verify migration replay/validation, core constraints and indexes against a clean database.
-3. Retry pushing `ad41085` and the status update once the GitHub proxy is available; start the Spring Boot repository foundation after the migration is verified.
+3. Start the Spring Boot repository foundation after the migration is verified.
 
 Update this file after every coding task with the date, branch and commit, verified work, tests actually run and results, deployment/demo URL if any, blockers, and the next three tasks. Do not mark untested implementation complete. Consult this file and the relevant product and technical source-of-truth documents before planning implementation.
