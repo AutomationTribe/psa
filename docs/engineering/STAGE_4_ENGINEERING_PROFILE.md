@@ -47,7 +47,7 @@ The product is not itself an emergency service and must not guarantee rescue. Ho
 
 ## Environment and evidence requirements
 
-- Separate development, test/staging and production environments.
+- Maintain exactly two environments: Local for development and automated testing, and Pilot for hosted real-device practice and approved live-pilot use. Keep practice and live incident data and workflows visibly isolated within Pilot.
 - Separate practice/test and live incident data.
 - Synthetic monitoring of incident creation and provider connectivity.
 - Representative low-end and midrange Android devices plus supported iPhones.

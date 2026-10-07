@@ -1,16 +1,17 @@
 # Functional Requirements
 
-Status: Stage 3 approved; USSD deferred under `docs/tags/USSD.md`
+Status: Stage 3 baseline; founder decisions from 2026-10-07 incorporated as a review draft; USSD deferred under `docs/tags/USSD.md`
 Date: 2026-10-06  
 Source: [Approved Product Definition](../product/PRODUCT_DEFINITION.md)
 
 ## Actors
 
 - **User:** Uses safety monitoring, trips, SOS, fake call and location sharing.
-- **Trusted contact:** Receives and acknowledges alerts. Cannot request location on demand.
-- **Family member:** A user inside a family circle.
-- **Family head:** Manages the family circle and may request a consenting member's location.
+- **Trusted contact:** May be added without an app account and receives SOS-only SMS. Cannot request location on demand.
+- **Family member:** An app account holder who has accepted an invitation into a family circle.
+- **Family head:** Manages the family circle, selects an accepted and consenting member to start location tracking, and may request an on-demand refresh.
 - **Operator:** Handles incidents through the monitoring dashboard.
+- **Administrator:** Uses the admin dashboard to manage platform configuration, subscription packages, retention and administrative access.
 - **Supervisor:** Manages operators, playbooks and controlled access.
 - **Partner system:** Integrates later through approved APIs.
 
@@ -18,11 +19,13 @@ Source: [Approved Product Definition](../product/PRODUCT_DEFINITION.md)
 
 - **FR-001:** A user shall create and verify an account using supported identity methods.
 - **FR-002:** A user shall maintain a safety profile containing their name, verified phone number and optional information approved for emergency use.
-- **FR-003:** A user shall invite trusted contacts, and a contact must accept before receiving routine location sharing or incident access.
-- **FR-004:** A user shall select which accepted contacts receive SOS alerts.
+- **FR-003:** A user shall add a trusted-circle member by phone number without requiring an account or acceptance. The member shall receive SOS-only SMS and shall not receive routine locations or query locations. A valid phone number is required.
+- **FR-004:** A user shall select which trusted-circle members receive SOS alerts.
 - **FR-005:** The system shall explain each requested device permission and show the resulting capability when permission is granted, limited or denied.
 - **FR-006:** The system shall provide a guided practice alert that is clearly labelled as a test for the user, contacts and operators.
 - **FR-007:** A user shall see and revoke active sharing permissions and contact access.
+- **FR-008:** When a non-platform trusted member is added, the system shall send an SMS and, if supplied, email notice with a platform signup link. SOS SMS shall include that link until the member has an account. Existing platform members shall not receive signup links. A non-member who joins through either link and verifies the invited identity shall be automatically linked to the originating trusted circle, and the circle owner shall be notified. The circle owner shall be able to see membership/link status and revoke the relationship.
+- **FR-009:** On account deletion, the system shall revoke sessions and remove the user from family memberships immediately. If the user heads a family, it shall dissolve that family, stop its tracking/monitoring, and attempt to notify its members by SMS and email using available verified channels. It shall not notify the deleted user's trusted-circle members. Active incidents and other records shall follow retention durations configurable by record class in the admin dashboard/backend, subject to applicable legal holds.
 
 ## Continuous safety monitoring
 
@@ -51,7 +54,7 @@ Source: [Approved Product Definition](../product/PRODUCT_DEFINITION.md)
 - **FR-031:** The app shall provide an accessible trigger designed to reduce accidental activation while remaining fast in an emergency.
 - **FR-032:** An SOS incident shall record its trigger source: manual, missed check-in, USSD, partner API or another approved source.
 - **FR-033:** On trigger, the system shall capture the latest available location with its source, timestamp and accuracy, or explicitly record location as unavailable.
-- **FR-034:** The system shall notify the monitoring team and attempt alerts to the user's selected contacts through configured channels.
+- **FR-034:** The system shall notify the monitoring team and attempt SOS SMS to the user's selected trusted-circle members and relevant family members. Non-platform trusted members receive SOS-only SMS; the SMS includes a signup link until they become platform members. Existing platform members receive no signup link. SMS shall include available coordinates and capture time/accuracy context; unavailable or stale location shall be labelled.
 - **FR-035:** Delivery state shall distinguish app queueing, provider acceptance, delivery evidence where available, contact acknowledgement and failure.
 - **FR-036:** The system shall retry eligible failed alert operations according to a controlled policy without creating duplicate incidents or duplicate uncontrolled escalations.
 - **FR-037:** Contacts shall be able to acknowledge an SOS and see only the incident information authorized for them.
@@ -63,7 +66,7 @@ Source: [Approved Product Definition](../product/PRODUCT_DEFINITION.md)
 ## Location and sharing
 
 - **FR-050:** A user shall select one of these location modes: SOS only, periodic sharing or always available.
-- **FR-051:** A user shall choose the recipients of periodic or user-initiated sharing from accepted contacts.
+- **FR-051:** A user shall choose recipients of periodic or user-initiated sharing from platform users with an active sharing relationship and active family-location permissions. Account-less trusted members are eligible only for SOS SMS.
 - **FR-052:** Every displayed location shall include its captured time, freshness status and available accuracy information.
 - **FR-053:** The system shall distinguish a current fix, a recent cached fix, an old last-known fix and unavailable location.
 - **FR-054:** The app shall adapt location collection to the active context, using lower power behavior when idle and higher urgency during a trip or SOS where the platform permits.
@@ -79,15 +82,15 @@ Source: [Approved Product Definition](../product/PRODUCT_DEFINITION.md)
 
 ## Family option
 
-- **FR-060:** A user shall create a family circle and become its initial family head.
-- **FR-061:** The family head shall invite members by supported SMS or email link, and each member must complete onboarding before joining.
-- **FR-062:** An adult member shall explicitly grant or deny the family head permission to request their location on demand.
-- **FR-063:** An adult member shall revoke that permission at any time, taking effect for new requests.
-- **FR-064:** An approved family-head request shall return the best available location with timestamp, accuracy and freshness; it shall not present an old location as live.
-- **FR-065:** Each request and result shall be logged and visible to the member, including requester and time.
+- **FR-060:** A user shall create one or more family circles and become the head of each created family.
+- **FR-061:** The family head shall invite members by SMS and, when supplied, email. An existing platform user may accept or decline. An invitee without an account shall be told to sign up; after completing onboarding through the invitation and accepting the disclosed location consent, the system shall add them to the family immediately. A decline shall not add the invitee and shall notify the family head; joining shall also update the family head.
+- **FR-062:** The family head shall select an accepted member in the family view to start location tracking, subject to the member's consent, active location mode and platform permissions.
+- **FR-063:** A family member shall be notified when tracking starts and may stop or revoke family tracking at any time; revocation shall immediately prevent non-SOS family views and refresh requests. SOS-only location sharing remains a separate user-selected mode for an explicitly triggered incident.
+- **FR-064:** A family-head location view or on-demand refresh shall return the best available location with capture time, accuracy and freshness; it shall not present an old location as live.
+- **FR-065:** Family tracking activation, location views/refreshes and results shall be logged and visible to the member, including requester, time and result state.
 - **FR-066:** Family-head status shall not allow silent access to microphone, audio recordings or unrelated incident history.
 - **FR-067:** A minor account shall be created only through an adult family-head invitation and shall belong to an active family circle.
-- **FR-068:** Removing a member or leaving a family shall revoke future family-location access.
+- **FR-068:** Removing a member or leaving a family shall revoke future family-location access and family-circle SOS recipient routing.
 - **FR-069:** The adult family head shall manage the minor's family membership and approved safety permissions, subject to verified guardian authority and applicable child-consent rules.
 
 ## Fake call
@@ -115,7 +118,9 @@ Status: Deferred; excluded from version 1. Resume only through the `USSD` tag.
 - **FR-092:** A USSD alert shall clearly identify the caller-supplied, network-supplied and previously known location sources; it shall not imply GPS from the absent user's phone.
 - **FR-093:** USSD shall not be included in version 1 and shall remain behind a feature flag until provider coverage, cost, identity, security and end-to-end behavior are validated.
 
-## Monitoring dashboard
+## Admin dashboard: monitoring and administration
+
+The admin dashboard is the team's administrative web application. It includes 24-hour incident monitoring and operator workflows, plus privileged platform settings, subscriptions, retention policies, user/family administration, and audit review. Configuration changes are versioned, access-controlled and audited.
 
 - **FR-100:** Operators shall see a prioritized queue separating live and practice incidents.
 - **FR-101:** The incident view shall show trigger source, user/contact details permitted for response, location history with freshness, delivery state, acknowledgements and action timeline.
@@ -135,7 +140,7 @@ Status: Deferred; excluded from version 1. Resume only through the `USSD` tag.
 - **FR-112:** Partners shall create incident alerts using repeat-safe requests and provide trigger, user and location provenance.
 - **FR-113:** Partners shall receive incident status through authenticated retrieval or signed callbacks.
 - **FR-114:** A partner shall not use the family-head on-demand location privilege or query by phone number alone.
-- **FR-115:** Test and live events shall use separate environments and be visibly distinguishable.
+- **FR-115:** Automated test data shall remain in Local. Within Pilot, practice and live events shall be visibly distinguishable, access-controlled separately and routed so practice events cannot trigger real authority escalation.
 - **FR-116:** Partner access, requests, responses, failures, revocation and rate-limit events shall be auditable.
 
 ## Subscription configuration
@@ -151,7 +156,7 @@ Status: Deferred; excluded from version 1. Resume only through the `USSD` tag.
 
 The following must be configurable and approved before live release: reminder timing; missed-check-in grace period; location freshness thresholds by safety mode; permitted update frequencies; retry limits; Critical escalation steps; operator acknowledgement target; contact ordering; evidence retention; audio retention; incident closure rules; and subscription packages.
 
-Incident, location, audio and operator evidence shall use a default retention period of 60 days. Authorized administrators may configure retention only within approved legal and operational limits. Every change shall be audited and shall not silently bypass an active legal hold.
+Incident, location, audio and operator evidence shall use an initial default retention period of 60 days. Authorized administrators may configure retention by record class in the admin dashboard/backend, within approved legal and operational limits. Every change shall be audited and shall not silently bypass an active legal hold.
 
 ## Deferred policy decisions
 

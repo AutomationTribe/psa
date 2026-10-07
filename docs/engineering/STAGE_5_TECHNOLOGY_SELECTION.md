@@ -53,7 +53,7 @@ Use internal provider interfaces for SMS, push notifications, maps/geocoding, pa
 - Containerized modular monolith and workers on a managed container platform.
 - Managed PostgreSQL with backups and point-in-time recovery.
 - Managed durable queue, Redis and encrypted object storage.
-- Separate development, staging and production accounts/environments.
+- Maintain two environments only: Local development/testing and hosted Pilot. Use separate credentials, databases and provider configuration; isolate practice and live incidents within Pilot.
 - Infrastructure as code, automated migrations, secret manager and deployment rollback.
 
 ## Free-first development and delivery plan
@@ -64,15 +64,15 @@ Use internal provider interfaces for SMS, push notifications, maps/geocoding, pa
 - Deploy the backend, workers and monitoring dashboard to Railway.
 - Use Neon for shared PostgreSQL/PostGIS data.
 - Deploy each completed and tested vertical feature slice; do not wait for a big-bang release.
-- Keep development, staging/practice and live configuration separated.
+- Keep Local and Pilot configuration separated. Pilot practice incidents must use test routing and must not invoke real authority escalation; live incidents use approved live-provider routing.
 - Use Firebase Cloud Messaging for push notifications at no charge.
 - Use email and SMS sandbox/test credits first; purchase only a small Nigerian SMS balance for real-device delivery checks.
 
 ## Later paid-cloud reference cost
 
-- Development/staging kept small: approximately USD 80–180 monthly.
+- Local development is expected to use the developer's existing hardware and free tools; Pilot hosting cost will be controlled and measured against the approved budget.
 - Controlled pilot: approximately USD 150–350 monthly.
-- Redundant live production baseline: approximately USD 350–800 monthly before SMS, maps, payment fees, support and large audio/data usage.
+- Later high-availability hosting at larger scale: approximately USD 350–800 monthly before SMS, maps, payment fees, support and large audio/data usage. This is a possible upgrade to the Pilot environment, not a third required environment.
 
 AWS Cape Town is only a later comparison option. It would run infrastructure in Amazon data centres in South Africa; it does not provide monitoring operators, emergency response, GPS or SMS.
 

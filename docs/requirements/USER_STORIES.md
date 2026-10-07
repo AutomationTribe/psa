@@ -1,18 +1,21 @@
 # User Stories and Acceptance Criteria
 
-Status: Stage 3 approved; USSD deferred under `docs/tags/USSD.md`
-Date: 2026-10-06
+Status: Stage 3 baseline; founder decisions from 2026-10-07 incorporated as a review draft; USSD deferred under `docs/tags/USSD.md`
+Date: 2026-10-07
 
 ## US-001 — Prepare a trusted circle
 
-As a user, I want accepted trusted contacts to receive my emergency alerts.
+As a user, I want to add trusted members who can receive SOS SMS even if they do not use the app.
 
 Acceptance criteria:
 
-1. An invitation does not grant access until accepted.
-2. The user selects which accepted contacts receive SOS alerts.
-3. Removing a contact prevents new access but preserves required incident audit history.
-4. A normal trusted contact cannot request the user's location on demand.
+1. The user can add a trusted member by phone without requiring that person to have an account or accept an invitation.
+2. A non-platform trusted member receives SOS-only SMS and never routine location updates or on-demand location access.
+3. The notice that the member was added includes a signup link by SMS and, if supplied, email; SOS SMS includes the link until the member joins.
+4. Existing platform members receive no signup link. A non-member who signs up through either link and verifies the invited identity is automatically linked to the originating circle, and the owner is notified.
+5. The user selects which trusted members receive SOS alerts; SMS requires a valid phone number.
+6. Removing/revoking a member prevents future alerts but preserves required incident audit history.
+7. A trusted member cannot request the user's location on demand.
 
 ## US-002 — Use continuous safety monitoring
 
@@ -79,24 +82,30 @@ As a family head, I want to invite relatives and manage the family circle.
 
 Acceptance criteria:
 
-1. Each member accepts their invitation.
-2. Adult members decide separately whether the family head may request location.
-3. Trusted-contact and family-head permissions are shown as different permissions.
-4. Leaving or removal revokes future family access.
-5. A minor joins only through an adult family-head invitation sent by SMS or email and completes onboarding into that family.
-6. Guardian authority and applicable child-consent rules must be verified before the minor's safety permissions become active.
+1. Existing platform users can accept or decline a family invitation and see a clear explanation of membership and location tracking.
+2. A non-user is told to sign up; accepting the disclosed location consent and completing onboarding through the invitation adds them to the family immediately.
+3. Acceptance/onboarding includes explicit, recorded consent for family location tracking under the member's configured location mode.
+4. The family head opens the family, selects an accepted member and starts tracking; the member is notified.
+5. A member can stop or revoke routine family tracking; leaving/removal revokes family access and SOS-circle delivery. An explicit SOS uses the separate SOS-only sharing mode.
+6. A decline does not add the invitee and updates the family head.
+7. The family head is updated when an invited member joins.
+8. A minor joins only through an adult family-head invitation sent by SMS or email and completes onboarding into that family.
+9. Guardian authority and applicable child-consent rules must be verified before the minor's safety permissions become active.
+10. Accepted family-circle members receive SMS when a member raises SOS, with available coordinates and capture time/accuracy; unavailable or stale location is clearly labelled.
+11. A user may be head of more than one family.
 
-## US-008 — Request a family member's location
+## US-008 — Monitor a family member's location
 
-As a family head, I want to request a consenting member's location.
+As a family head, I want to select an accepted family member to track and see their latest consented location.
 
 Acceptance criteria:
 
-1. The request is allowed only for an active family member who granted permission.
-2. A denied or revoked permission returns no location.
-3. The result identifies capture time, freshness, accuracy and unavailable state.
-4. The member can see the request and requester in access history.
-5. No other trusted contact or partner receives this capability.
+1. Only active family members who accepted/joined with disclosed location consent can be selected.
+2. The family head explicitly selects a member to start tracking; selection is logged and the member is notified.
+3. A member may stop/revoke routine tracking, which prevents further family reads; SOS-only incident sharing remains a separate mode.
+4. The result identifies capture time, freshness, accuracy and unavailable state and follows the member's location mode.
+5. The member can see tracking state, views/requests and the requester in access history.
+6. No other trusted contact or partner receives this capability.
 
 ## US-009 — Schedule a fake call
 
@@ -171,6 +180,18 @@ Acceptance criteria:
 3. The app retries through approved available paths without creating duplicate incidents.
 4. Historical, estimated and current locations are visibly different.
 5. When connectivity returns, queued evidence is synchronized with its original capture time and source.
+
+## US-016 — Delete an account and end its family access
+
+As a user, I want account deletion to revoke my access and stop family tracking under my account.
+
+Acceptance criteria:
+
+1. Deletion revokes active sessions and removes the user from family memberships immediately.
+2. If the deleted user heads a family, that family is dissolved, its monitoring stops, and its members are notified by SMS and email using available verified channels.
+3. Trusted contacts are not notified when an account is deleted.
+4. Active incidents and other records follow retention durations configurable by record class in the admin dashboard/backend, subject to applicable legal holds.
+5. Personal SOS functionality belonging to other family members is not disabled by the head's account deletion.
 
 ## US-014 — Configure subscription packages
 
