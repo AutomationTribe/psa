@@ -2,7 +2,7 @@
 
 Date: 2026-10-07
 Branch: `main`
-Commit: base `a76eb61`; V2 migration, tests and docs founder-approved 2026-10-07 and committed on `main` (hash recorded after publication)
+Commit: base `a76eb61`; V2 migration, tests and docs founder-approved 2026-10-07 and published to GitHub `main` as `11c21af` (remote verified identical to local)
 
 ## Work actually completed
 
