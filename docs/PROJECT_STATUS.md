@@ -1,8 +1,8 @@
 # Project Status — Personal Safety App
 
-Date: 2026-10-07
+Date: 2026-10-08
 Branch: `main`
-Commit: base `a76eb61`; V2 migration, tests and docs founder-approved 2026-10-07 and published to GitHub `main` as `11c21af` (remote verified identical to local)
+Commit: framework 1.1.0 adoption on top of `504d05f` (the adoption commit's own SHA is recorded in a follow-up status commit)
 
 ## Work actually completed
 
@@ -45,6 +45,7 @@ Commit: base `a76eb61`; V2 migration, tests and docs founder-approved 2026-10-07
   - Added `database/tests/v2_legal_hold_concurrency_test.sh` (two coordinated psql sessions on a scratch copy of the migrated database; optional `NEGATIVE_CONTROL=1`).
 - Founder approved V2 (incident-mode immutability, append-only audit with controlled retention, legal-hold/purge concurrency, READ COMMITTED enforcement, orphan-hold guard) on 2026-10-07. Approval covers the Local-validated migration and tests only; the blockers below must be resolved before audit retention is enabled or Pilot deployment.
 - Fixed a stale commit reference in this file and updated `database/README.md` with the verified status and the Apple Silicon platform note.
+- Adopted the AI Software Delivery Framework 1.1.0 (2026-10-08, forward-only, authorised by the Product Owner during the in-progress database slice; the framework-only adoption was committed separately from the V3/reviewer work). Source: `https://github.com/AutomationTribe/ai-software-delivery-framework.git`, tag `v1.1.0` (tag object `8c3daf488c14faac6b1a8f98edc801cd7bb212a2`, commit `31dd835e4854418a67b0e13b020b0a7b79c84cd2`). Installed unmodified: the ten canonical agents in `.claude/agents/` (`design`, `database-architect`, `backend`, `backend-reviewer`, `frontend`, `frontend-reviewer`, `reviewer`, `qa`, `security`, `devops`) and `docs/framework/` (`POLICY.md`, `VERSIONING.md`, `ADOPTION.md`, `PROJECT-CONFIGURATION.md`, `VALIDATION.md`, `prompts/`, `FRAMEWORK_VERSION` = 1.1.0). Project-specific files created: `docs/framework/PROJECT_PROFILE.md` (criticality `HIGH-CRITICALITY` and readability `SENIOR` taken from the approved Stage 4 decisions, mapping to be confirmed by the Product Owner; blank fields listed in the file) and `docs/framework/ADOPTION_RECORD.md` (version, SHA, agents, compatibility exceptions). `CLAUDE.md` gained an additive "AI Software Delivery Framework (version 1.1.0)" section (framework rules 1-16, profiles applied); PSA's stage gates, USSD rule and status-log rules are unchanged and take precedence where stricter. No product code, schema or configuration was changed and nothing was deployed; no hook or other automated enforcement was added.
 - No mobile app, backend API or dashboard feature has been implemented yet.
 
 ## Tests actually executed
@@ -69,6 +70,12 @@ Local database validation, 2026-10-07 (Docker 29.4.1, Compose v5.1.3, disposable
   - Negative controls (same script, failed checks are the expected outcome): locks removed, 19 PASS / 21 FAIL (including S2 and S4 deleting covered rows, and orphan holds committing); only the READ COMMITTED enforcement removed (`NEGATIVE_CONTROL=isolation`), 30 PASS / 10 FAIL, including "row covered by committed hold retained" failing for purge under REPEATABLE READ and SERIALIZABLE and for direct DELETE under REPEATABLE READ, i.e. the isolation race is real without the enforcement. An earlier version of S6 ended in ROLLBACK and so could not show the deletion; it was corrected to COMMIT before these results.
   - Existing 41-check suite re-run after the isolation and orphan-hold changes: 41 PASS / 0 FAIL on both databases. Migration replay: no-op at v2 on both.
   - Not tested: pooled-connection (e.g. transaction-pooler) isolation settings, purge performance at volume, lock wait timeouts/`lock_timeout` settings for the retention job and admin hold writes, multi-statement admin transactions that touch `legal_hold` for a long time (they delay purges), failover behavior, Neon permissions, behavior under superuser/owner bypass, integration with real application roles (none exist).
+- Framework adoption verification, 2026-10-08:
+  - `scripts/validate.py` (framework v1.1.0 checkout, pinned tag): 122 PASS / 0 FAIL.
+  - `scripts/validate.py --project` on the exact tree that was committed (exported from the git index): 97 PASS / 0 FAIL; on the working tree (which also holds the uncommitted PSA database-architect overlay): 98 PASS / 0 FAIL. Covers agent frontmatter (name, description, tools, model; name matches file), read-only reviewers have no write tools (database-architect, backend-reviewer, frontend-reviewer, reviewer, security), every `docs/framework/` reference in the agents resolves, the required framework files exist, and the project profile has no unfilled placeholders.
+  - Manual checks: installed agents and `POLICY.md`/`VERSIONING.md` are byte-identical to the v1.1.0 checkout (`cmp`); design conformance is owned by `frontend-reviewer` and `POLICY.md`/`CLAUDE.md` state there is no separate mandatory conformance gate (`design.md` says it runs no conformance gate); QA, Security, human acceptance and DevOps/deployment steps are present in the workflow; PSA's stage gates remain in `CLAUDE.md`; no JSON/config file was edited.
+  - Finding (not fixed, canonical file left unmodified): a strict YAML parser rejects `.claude/agents/devops.md` (an unquoted `: ` inside its `description`; the other nine agents parse). `validate.py` uses a lenient frontmatter reader and does not catch it. Whether Claude Code loads that agent was NOT tested (agents load at session start). To be raised upstream; it matters only when the `devops` agent is first needed.
+  - NOT verified: that Claude Code loads the ten agents (not tested; needs a restart), behaviour of any agent, and any automated enforcement (none was added). Application tests: not run (no application code).
 - V1-only findings (RESOLVED by V2 as shown above; recorded for history):
   - `incident.incident_mode` can be changed by UPDATE; Stage 8 constraint 4 says it is immutable. No DB trigger enforces this.
   - `incident_audit_event` rows can be UPDATEd; Stage 8 constraint 13 says application roles cannot edit audit events. No trigger or role privileges exist (V1 has no GRANT/REVOKE/ROLE statements).
@@ -79,6 +86,7 @@ Local database validation, 2026-10-07 (Docker 29.4.1, Compose v5.1.3, disposable
 
 ## Current blockers
 
+- Framework adoption follow-ups (see `docs/framework/ADOPTION_RECORD.md`): Product Owner to confirm the criticality mapping (`HIGH-CRITICALITY`) and to decide the pending exceptions (PSA database-architect overlay, native-mobile review coverage); fill the blank profile fields (API contract and decision log, security document, ADR directory, technical-debt register, design tool/registry, build/test/deploy commands) before the slices that need them; `devops.md` strict-YAML issue to raise upstream.
 - **Must be resolved before audit retention is enabled or any real audit data is stored:** (a) V3 must define the least-privilege runtime roles (API, worker, retention job) and grant the retention job login/EXECUTE on `purge_expired_audit_events` only, plus run it and admin hold writes at READ COMMITTED (enforced for the purge and event-level holds; confirm the connection pool does not override it) and set `lock_timeout`/`statement_timeout` for it and for admin legal-hold writes (a long-open transaction writing `legal_hold` delays purges, and an open purge delays hold writes); (b) the admin dashboard/backend must create `retention_policy_version` rows for classes `INCIDENT_AUDIT_EVENT` and `SYSTEM_AUDIT_EVENT` (until then rows are kept forever by design) and create/release `legal_hold` rows using the record types documented in V2; (c) existing audit rows inserted before a policy exists have `retain_until` NULL and cannot be given a deadline because UPDATE is blocked, so any backfill needs a separately reviewed owner-run migration; (d) creating `psa_audit_retention` and `ALTER FUNCTION ... OWNER` need privileges not yet verified on Neon; (e) audit retention periods and legal bounds still need founder/legal confirmation.
 - V2 triggers can be disabled by the table owner or a superuser; runtime roles must not own tables or hold DDL/TRIGGER privileges.
 - Flyway image lacks arm64; Local on Apple Silicon needs `DOCKER_DEFAULT_PLATFORM=linux/amd64` (emulation). Consider a Flyway tag with an arm64 build or document the override permanently.
@@ -91,8 +99,8 @@ Local database validation, 2026-10-07 (Docker 29.4.1, Compose v5.1.3, disposable
 
 ## Next three recommended tasks
 
-1. Review and approve V2, then commit; define and test least-privilege runtime roles (non-owner API/worker/retention job, no DDL/TRIGGER) in a V3 migration, closing the blocker above.
-2. Wire the migration and `database/tests/` scripts into CI against disposable PostgreSQL/PostGIS, and verify role creation/ownership on Neon.
-3. Start the Spring Boot repository foundation (pinned Flyway PostgreSQL module and JDBC driver) with integration tests against the Local database.
+1. Review and decide on the in-progress database slice (V3 least-privilege roles and the read-only database-review tooling, uncommitted), including the open authority decisions, then run the framework's `database-architect` on it per the Definition of Done before committing.
+2. Product Owner: confirm the `HIGH-CRITICALITY` profile mapping and decide the pending compatibility exceptions in `docs/framework/ADOPTION_RECORD.md` (PSA database-architect overlay, native-mobile review coverage); fill the blank fields in `docs/framework/PROJECT_PROFILE.md` as slices need them.
+3. Start the Spring Boot repository foundation following the framework workflow (Definition of Ready, `database-architect` for material schema work, `backend` then `backend-reviewer`), only after the database slice is settled.
 
 Update this file after every coding task with the date, branch and commit, verified work, tests actually run and results, deployment/demo URL if any, blockers, and the next three tasks. Do not mark untested implementation complete. Consult this file and the relevant product and technical source-of-truth documents before planning implementation.
