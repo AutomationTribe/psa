@@ -36,4 +36,4 @@ canonical files themselves).
 
 | Date | From | To | Commit | Notes |
 |---|---|---|---|---|
-| 2026-10-08 | — | 1.1.0 | see `git log` for the commit that added this file (SHA recorded in `docs/PROJECT_STATUS.md`) | Initial adoption, forward-only, authorised mid-task by the Product Owner. |
+| 2026-10-08 | — | 1.1.0 | `018f17fcbde1db58cec0daf54a089242de402def` | Initial adoption, forward-only, authorised mid-task by the Product Owner. |
