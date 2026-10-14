@@ -1,0 +1,892 @@
+openapi: 3.0.3
+info:
+  title: PSA API - identity and access (DESIGN DRAFT, part 1, revision 2)
+  version: 0.2.0-draft
+  description: |
+    **Local design draft. Not approved. Not implemented.** Revision 2 of 2026-10-10: the first draft's 26 operations were
+    audited against the approved numbered requirements and user stories; 16 operations remain and 10 were removed because
+    no approved requirement supports them. Companion document with the audit, requirement changes needed, decisions and
+    gaps: `docs/api/API_DESIGN_IDENTITY_ACCESS.md`.
+
+    Every operation carries `x-support` and `x-requirements` (what it rests on). EXPLICIT = a numbered requirement states
+    the capability. IMPLIED = not stated by a numbered requirement, but implied by approved architecture or security text
+    (Stage 6, Stage 8) or by NFR-031/NFR-033. CHANGE_REQUIRED = needs a proposed requirement change (`x-requirement-change`)
+    before it should be built. Operations with no support at all were removed. Anything that depends on an unmade choice carries `x-decision` naming it: FD-n is a founder product
+    decision, TC-n is a technical choice with a recommended default.
+
+    Conventions in this draft (TC-1): JSON only, lowerCamelCase fields, UUID identifiers, RFC 3339 UTC instants, stable
+    machine-readable error codes, no secrets or one-time codes in logs.
+  x-status: draft-local-uncommitted
+servers:
+  - url: /api/v1
+    description: "Relative to the API origin. Local only until a deployment is approved."
+tags:
+  - name: Authentication
+    description: "Signup, login and token refresh for the mobile apps (bearer credentials). Public operations except logout."
+  - name: Account
+    description: "The signed-in person's own account and identifiers (bearer credentials)."
+  - name: Staff authentication
+    description: "Operator, supervisor and administrator sign-in for the dashboard (cookie session, second factor, CSRF)."
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/signup/challenges:
+    post:
+      tags: [Authentication]
+      operationId: startSignup
+      summary: "Start signup by proving control of a phone number or e-mail address"
+      description: |
+        Requests a one-time code to be sent to the identifier. The response is identical whether or not an account
+        already exists for the identifier (no account enumeration); if the identifier already belongs to a verified
+        account, no signup code is issued. No account is created until the code is verified. Public signup creates
+        ordinary adult accounts: FR-067 says a minor account is created only through an adult family-head invitation,
+        which is the family part of the API, not this one.
+      security: []
+      x-support: EXPLICIT
+      x-requirements: [FR-001, NFR-033]
+      x-rate-limit-class: AUTH_CHALLENGE
+      x-decision: [FD-2, TC-2, TC-4, TC-5, TC-6, TC-7]
+      x-idempotency: "Not required (TC-8). Repeated requests inside the cooldown return the same challenge."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StartSignupRequest' }
+            example:
+              identifier: { type: PHONE, value: '+2340000000001' }
+              displayName: Ada Test
+      responses:
+        '202': { $ref: '#/components/responses/ChallengeAccepted' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /auth/signup/verifications:
+    post:
+      tags: [Authentication]
+      operationId: completeSignup
+      summary: "Verify the code, create the account and open the first device session"
+      description: |
+        On success, atomically creates the account, the verified primary identifier, the device registration and the
+        first device session, and returns the credentials. A wrong, expired, used or unknown challenge all return the
+        same `CHALLENGE_INVALID` error. A code can be used once; failed attempts are counted per challenge.
+      security: []
+      x-support: EXPLICIT
+      x-requirements: [FR-001, FR-002, NFR-033]
+      x-rate-limit-class: AUTH_VERIFY
+      x-decision: [FD-2, TC-2, TC-3, TC-4, TC-7, TC-8]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VerifyChallengeRequest' }
+            example:
+              challengeId: 7b6f2a3c-1d5e-4c8a-9a52-0d4f6b8e1a10
+              code: '123456'
+              device: { platform: ANDROID, label: Test phone }
+      responses:
+        '201':
+          description: "Account created and session opened."
+          headers:
+            X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionGranted' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '422': { $ref: '#/components/responses/ChallengeInvalid' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /auth/login/challenges:
+    post:
+      tags: [Authentication]
+      operationId: startLogin
+      summary: "Start login by requesting a one-time code for a verified identifier"
+      description: |
+        Same uniform response whether or not the identifier belongs to an account, and whether or not the account is
+        allowed to sign in. A code is sent only when it is. Sign-in is implied by FR-001 and NFR-033 but no numbered
+        requirement states it (requirement change RC-1).
+      security: []
+      x-support: IMPLIED
+      x-requirements: [NFR-033, S6-SEC]
+      x-rate-limit-class: AUTH_CHALLENGE
+      x-decision: [FD-2, TC-2, TC-4, TC-5]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StartLoginRequest' }
+            example:
+              identifier: { type: EMAIL, value: ada@example.test }
+      responses:
+        '202': { $ref: '#/components/responses/ChallengeAccepted' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /auth/login/verifications:
+    post:
+      tags: [Authentication]
+      operationId: completeLogin
+      summary: "Verify the code and open a device session"
+      description: |
+        Returns a session for an ACTIVE account. For a SUSPENDED account the session has SOS-only scope, because the
+        approved policy is that suspension must not block SOS (FD-3). A DELETED account, and any challenge problem,
+        return the same `CHALLENGE_INVALID` error. Revoking sessions at deletion is an action of the deletion workflow
+        (FR-009 says the system revokes sessions on deletion); it is not an operation of this contract. Refusing sign-in
+        for a DELETION_PENDING account is this draft's assumption: FR-009 does not say when "deletion" starts or whether
+        sign-in is refused while it is pending (assumption A-1 in the design document).
+      security: []
+      x-support: IMPLIED
+      x-requirements: [NFR-033, FR-009, US-016, S6-SEC]
+      x-rate-limit-class: AUTH_VERIFY
+      x-decision: [FD-2, FD-3, TC-2, TC-3, TC-4, TC-8]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VerifyChallengeRequest' }
+      responses:
+        '200':
+          description: "Session opened."
+          headers:
+            X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionGranted' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '422': { $ref: '#/components/responses/ChallengeInvalid' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /auth/token/refresh:
+    post:
+      tags: [Authentication]
+      operationId: refreshSession
+      summary: "Exchange a refresh credential for new credentials"
+      description: |
+        The refresh credential is single-use (rotation). Presenting one that was already used revokes the whole device
+        session. A revoked, expired or unknown credential returns `UNAUTHENTICATED`. Refreshing re-reads the account
+        status, so a suspended account moves to SOS-only scope. A session revoked by the deletion workflow (FR-009)
+        cannot be refreshed. Access credentials are checked against the session record on every request, so a revoked
+        session stops working immediately, not at token expiry.
+      security: []
+      x-support: IMPLIED
+      x-requirements: [NFR-033, FR-009, S6-SEC]
+      x-rate-limit-class: AUTH_VERIFY
+      x-decision: [FD-3, TC-3]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200':
+          description: "New credentials."
+          headers:
+            X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionGranted' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      operationId: logout
+      summary: "Revoke the current device session"
+      description: "Idempotent: logging out a session that is already revoked still returns 204 while the credential is otherwise valid. Only the current session; listing and revoking other sessions is not supported by an approved requirement (RC-2)."
+      security: [{ bearerAuth: [] }]
+      x-support: IMPLIED
+      x-requirements: [NFR-033, S6-SEC]
+      x-rate-limit-class: SESSION_MANAGEMENT
+      x-authorization: "Any authenticated session, including SOS-only scope."
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /me:
+    get:
+      tags: [Account]
+      operationId: getCurrentUser
+      summary: "The signed-in person's own account"
+      description: "Only the caller's own data. Identifiers are masked."
+      x-support: EXPLICIT
+      x-requirements: [FR-002]
+      x-rate-limit-class: ACCOUNT_READ
+      x-authorization: "Any authenticated session, including SOS-only scope."
+      responses:
+        '200':
+          description: "The caller's account."
+          headers:
+            X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    patch:
+      tags: [Account]
+      operationId: updateProfile
+      summary: "Change the display name"
+      description: |
+        Only `displayName` can be changed here; it is the only profile field the database lets the API role change.
+        FR-002's optional emergency information is not defined yet, so no field exists for it.
+      x-support: EXPLICIT
+      x-requirements: [FR-002]
+      x-rate-limit-class: ACCOUNT_WRITE
+      x-authorization: "FULL scope only."
+      x-decision: [TC-7]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProfileRequest' }
+      responses:
+        '200':
+          description: "The updated account."
+          headers:
+            X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentUser' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /me/identifiers:
+    get:
+      tags: [Account]
+      operationId: listIdentifiers
+      summary: "The caller's phone numbers and e-mail addresses (masked)"
+      x-support: IMPLIED
+      x-requirements: [FR-002, S8-DEC1]
+      x-rate-limit-class: ACCOUNT_READ
+      x-authorization: "Any authenticated session."
+      responses:
+        '200':
+          description: "The caller's identifiers."
+          headers:
+            X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IdentifierList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /me/identifiers/challenges:
+    post:
+      tags: [Account]
+      operationId: startIdentifierAdd
+      summary: "Start adding a second identifier (phone or e-mail) to the account"
+      description: |
+        Sends a one-time code to the new identifier. Uniform response whether or not the identifier is already verified
+        on another account. Requires a recent sign-in (TC-6). Stage 8 decision 1 approves an account with both a
+        verified phone and a verified e-mail; no numbered requirement says how the second is added (RC-3).
+      x-support: CHANGE_REQUIRED
+      x-requirement-change: [RC-3]
+      x-requirements: [S8-DEC1, FR-001, NFR-033]
+      x-rate-limit-class: AUTH_CHALLENGE
+      x-authorization: "FULL scope only."
+      x-decision: [FD-2, TC-2, TC-4, TC-5, TC-6]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StartIdentifierAddRequest' }
+      responses:
+        '202': { $ref: '#/components/responses/ChallengeAccepted' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /me/identifiers/verifications:
+    post:
+      tags: [Account]
+      operationId: completeIdentifierAdd
+      summary: "Verify the code and attach the identifier to the account"
+      description: "Same `CHALLENGE_INVALID` error for every challenge problem, including an identifier verified elsewhere."
+      x-support: CHANGE_REQUIRED
+      x-requirement-change: [RC-3]
+      x-requirements: [S8-DEC1, FR-001, NFR-033]
+      x-rate-limit-class: AUTH_VERIFY
+      x-authorization: "FULL scope only; the challenge must belong to the caller."
+      x-decision: [FD-2, TC-2, TC-4, TC-6]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VerifyIdentifierRequest' }
+      responses:
+        '200':
+          description: "The updated list of identifiers."
+          headers:
+            X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IdentifierList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '422': { $ref: '#/components/responses/ChallengeInvalid' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /staff/auth/challenges:
+    post:
+      tags: [Staff authentication]
+      operationId: startStaffLogin
+      summary: "First factor, step 1 - request a one-time code for a staff identifier"
+      description: |
+        Uniform response whether or not the identifier belongs to a staff account. A code is sent only to active
+        operators, supervisors and administrators whose account is ACTIVE and who have a second factor provisioned. How
+        staff accounts and second factors are provisioned is not specified by any approved requirement (RC-4, FD-5).
+      security: []
+      x-support: IMPLIED
+      x-requirements: [NFR-031, NFR-033, US-010, S6-SEC]
+      x-rate-limit-class: STAFF_AUTH
+      x-decision: [FD-2, FD-5, TC-2, TC-4, TC-5, TC-9]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StartLoginRequest' }
+      responses:
+        '202': { $ref: '#/components/responses/ChallengeAccepted' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /staff/auth/verifications:
+    post:
+      tags: [Staff authentication]
+      operationId: completeStaffFirstFactor
+      summary: "First factor, step 2 - verify the code and open a limited, pre-MFA session"
+      description: |
+        On success sets the pre-MFA cookie. That session can call only the second-factor operation. Any problem,
+        including a staff account with no second factor provisioned, returns `CHALLENGE_INVALID` (fail closed).
+      security: []
+      x-support: IMPLIED
+      x-requirements: [NFR-031, NFR-033, US-010, S6-SEC]
+      x-rate-limit-class: STAFF_AUTH
+      x-decision: [FD-5, TC-2, TC-4, TC-9]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VerifyStaffChallengeRequest' }
+      responses:
+        '200':
+          description: "Pre-MFA session opened."
+          headers:
+            X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+            Set-Cookie: { $ref: '#/components/headers/SetPreMfaCookie' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StaffPreMfaState' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '422': { $ref: '#/components/responses/ChallengeInvalid' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /staff/auth/mfa/verifications:
+    post:
+      tags: [Staff authentication]
+      operationId: completeStaffMfa
+      summary: "Second factor - verify it and open the full staff session"
+      description: |
+        Replaces the pre-MFA cookie with the staff session cookie and returns the CSRF token. A wrong factor returns
+        `AUTHENTICATION_FAILED` and is counted; the pre-MFA session is invalidated after a limit.
+      security: [{ staffPreMfaSession: [], csrfToken: [] }]
+      x-support: IMPLIED
+      x-requirements: [NFR-031, S6-SEC]
+      x-rate-limit-class: STAFF_AUTH
+      x-authorization: "Pre-MFA session only."
+      x-decision: [FD-5, TC-4, TC-9]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VerifyMfaRequest' }
+      responses:
+        '200':
+          description: "Staff session opened."
+          headers:
+            X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+            Set-Cookie: { $ref: '#/components/headers/SetStaffCookie' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StaffSession' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '422': { $ref: '#/components/responses/AuthenticationFailed' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /staff/session:
+    get:
+      tags: [Staff authentication]
+      operationId: getStaffSession
+      summary: "The current staff session and roles"
+      description: |
+        Roles are re-read from the database on every call, so a suspension or demotion takes effect on the next request
+        (the cookie holds no roles). The dashboard needs them to apply FR-102.
+      security: [{ staffSession: [] }]
+      x-support: IMPLIED
+      x-requirements: [NFR-031, FR-102]
+      x-rate-limit-class: ACCOUNT_READ
+      x-authorization: "Full staff session (operator, supervisor or administrator, ACTIVE)."
+      x-decision: [TC-9]
+      responses:
+        '200':
+          description: "The staff session."
+          headers:
+            X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+            Cache-Control: { $ref: '#/components/headers/NoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StaffSession' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /staff/auth/logout:
+    post:
+      tags: [Staff authentication]
+      operationId: logoutStaff
+      summary: "End the staff session and clear its cookie"
+      security: [{ staffSession: [], csrfToken: [] }, { staffPreMfaSession: [], csrfToken: [] }]
+      x-support: IMPLIED
+      x-requirements: [NFR-033, S6-SEC]
+      x-rate-limit-class: SESSION_MANAGEMENT
+      x-authorization: "Any staff or pre-MFA session. Idempotent."
+      x-decision: [TC-9]
+      responses:
+        '204':
+          description: "Session ended and cookie cleared."
+          headers:
+            X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+            Set-Cookie: { $ref: '#/components/headers/ClearStaffCookie' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Short-lived access credential of a revocable device session (Stage 6). Opaque to the client. Never a shared
+        backend credential. Token format and lifetimes are TC-3.
+    staffSession:
+      type: apiKey
+      in: cookie
+      name: __Host-psa_staff
+      description: |
+        Full staff session. HTTP-only, Secure, SameSite=Strict, Path=/ (Stage 6). Cookie name and attributes are a
+        proposal (TC-9). Roles are not stored in the cookie.
+    staffPreMfaSession:
+      type: apiKey
+      in: cookie
+      name: __Host-psa_staff_pre
+      description: "Limited session between first factor and second factor. Usable only on the second-factor and logout operations."
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: |
+        Required with a cookie session on every state-changing request (Stage 6, Stage 7 section 5). Returned in the
+        session body. The mechanism (synchronizer token) is TC-9.
+
+  headers:
+    CorrelationId:
+      description: "Identifier of this request in the logs. Safe to quote to support. Contains no personal data."
+      schema: { type: string, format: uuid }
+    NoStore:
+      description: "no-store. Responses that carry credentials or CSRF tokens must never be cached."
+      schema: { type: string, enum: [no-store] }
+    RetryAfter:
+      description: "Seconds to wait before retrying."
+      schema: { type: integer, minimum: 1 }
+    SetPreMfaCookie:
+      description: "Sets __Host-psa_staff_pre (HttpOnly; Secure; SameSite=Strict; Path=/; short Max-Age)."
+      schema: { type: string }
+    SetStaffCookie:
+      description: "Sets __Host-psa_staff (HttpOnly; Secure; SameSite=Strict; Path=/) and clears the pre-MFA cookie."
+      schema: { type: string }
+    ClearStaffCookie:
+      description: "Expires both staff cookies."
+      schema: { type: string }
+
+  responses:
+    ChallengeAccepted:
+      description: |
+        A challenge was accepted. This response is the same whether or not a code was actually sent. The `challengeId`
+        is always returned.
+      headers:
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ChallengeAccepted' }
+    NoContent:
+      description: "Done. No body."
+      headers:
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+    BadRequest:
+      description: "The request is malformed or fails validation. details lists the offending fields without echoing secret values."
+      headers:
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+          example:
+            code: VALIDATION_FAILED
+            message: Some fields are not valid.
+            correlationId: 0c5d3f2e-6a41-4f0b-8a52-6f2b9a1d7c10
+            details: [{ field: identifier.value, reason: INVALID_FORMAT }]
+    Unauthorized:
+      description: "No valid credential. The same body for missing, malformed, expired, revoked and unknown credentials."
+      headers:
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+          example:
+            code: UNAUTHENTICATED
+            message: Sign in to continue.
+            correlationId: 0c5d3f2e-6a41-4f0b-8a52-6f2b9a1d7c10
+    Forbidden:
+      description: |
+        Authenticated but not allowed: wrong scope (for example SOS-only), wrong role, or a failed CSRF check
+        (`CSRF_INVALID`).
+      headers:
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    PayloadTooLarge:
+      description: "Body larger than the limit (provisional, TC-1)."
+      headers:
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    UnsupportedMediaType:
+      description: "Content type is not application/json."
+      headers:
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    ChallengeInvalid:
+      description: |
+        The challenge or code is wrong, expired, already used, unknown, for another purpose, or the account may not sign
+        in. All of these return exactly this response (`CHALLENGE_INVALID`), so it cannot be used to probe accounts.
+      headers:
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+          example:
+            code: CHALLENGE_INVALID
+            message: The code is not valid. Request a new one.
+            correlationId: 0c5d3f2e-6a41-4f0b-8a52-6f2b9a1d7c10
+    AuthenticationFailed:
+      description: "The second factor did not verify (`AUTHENTICATION_FAILED`)."
+      headers:
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    TooManyRequests:
+      description: "Rate limit reached for this operation class. Limits and keys are TC-4."
+      headers:
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+          example:
+            code: RATE_LIMITED
+            message: Too many attempts. Try again later.
+            correlationId: 0c5d3f2e-6a41-4f0b-8a52-6f2b9a1d7c10
+    InternalError:
+      description: "Unexpected failure. No internal detail is returned."
+      headers:
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    ServiceUnavailable:
+      description: "A dependency needed for this operation is unavailable (database, code delivery)."
+      headers:
+        X-Correlation-Id: { $ref: '#/components/headers/CorrelationId' }
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+
+  schemas:
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [code, message, correlationId]
+      properties:
+        code:
+          type: string
+          description: "Stable machine-readable code. Clients branch on this, never on message."
+          enum:
+            - VALIDATION_FAILED
+            - UNAUTHENTICATED
+            - FORBIDDEN
+            - CSRF_INVALID
+            - CHALLENGE_INVALID
+            - AUTHENTICATION_FAILED
+            - RATE_LIMITED
+            - PAYLOAD_TOO_LARGE
+            - UNSUPPORTED_MEDIA_TYPE
+            - INTERNAL_ERROR
+            - SERVICE_UNAVAILABLE
+        message:
+          type: string
+          description: "Plain, non-sensitive text for people. Never contains codes, tokens, identifiers or internal detail."
+          maxLength: 300
+        correlationId: { type: string, format: uuid }
+        details:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/FieldProblem' }
+    FieldProblem:
+      type: object
+      additionalProperties: false
+      required: [field, reason]
+      properties:
+        field: { type: string, maxLength: 200, description: "JSON path of the field." }
+        reason:
+          type: string
+          enum: [REQUIRED, INVALID_FORMAT, TOO_SHORT, TOO_LONG, OUT_OF_RANGE, NOT_ALLOWED, UNKNOWN_FIELD]
+
+    Identifier:
+      type: object
+      additionalProperties: false
+      required: [type, value]
+      description: "Phone numbers are E.164; e-mail addresses are compared case-insensitively. Normalisation rules are TC-6."
+      properties:
+        type: { type: string, enum: [PHONE, EMAIL] }
+        value: { type: string, minLength: 3, maxLength: 254 }
+    DeviceInfo:
+      type: object
+      additionalProperties: false
+      required: [platform]
+      description: "Becomes a registered_device row. The push token is registered by the notifications API part, not here."
+      properties:
+        platform: { type: string, enum: [ANDROID, IOS] }
+        label: { type: string, minLength: 1, maxLength: 100 }
+
+    StartSignupRequest:
+      type: object
+      additionalProperties: false
+      required: [identifier, displayName]
+      properties:
+        identifier: { $ref: '#/components/schemas/Identifier' }
+        displayName: { type: string, minLength: 1, maxLength: 100, description: "Length bounds are provisional (TC-7)." }
+    StartLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [identifier]
+      properties:
+        identifier: { $ref: '#/components/schemas/Identifier' }
+    VerifyChallengeRequest:
+      type: object
+      additionalProperties: false
+      required: [challengeId, code, device]
+      properties:
+        challengeId: { type: string, format: uuid }
+        code: { type: string, minLength: 4, maxLength: 10, pattern: '^[0-9]+$', description: "Length is TC-2. Never logged." }
+        device: { $ref: '#/components/schemas/DeviceInfo' }
+    VerifyStaffChallengeRequest:
+      type: object
+      additionalProperties: false
+      required: [challengeId, code]
+      properties:
+        challengeId: { type: string, format: uuid }
+        code: { type: string, minLength: 4, maxLength: 10, pattern: '^[0-9]+$' }
+    RefreshRequest:
+      type: object
+      additionalProperties: false
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string, minLength: 20, maxLength: 512, description: "Secret. Never logged." }
+    UpdateProfileRequest:
+      type: object
+      additionalProperties: false
+      required: [displayName]
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 100 }
+    StartIdentifierAddRequest:
+      type: object
+      additionalProperties: false
+      required: [identifier]
+      properties:
+        identifier: { $ref: '#/components/schemas/Identifier' }
+    VerifyIdentifierRequest:
+      type: object
+      additionalProperties: false
+      required: [challengeId, code]
+      properties:
+        challengeId: { type: string, format: uuid }
+        code: { type: string, minLength: 4, maxLength: 10, pattern: '^[0-9]+$' }
+    VerifyMfaRequest:
+      type: object
+      additionalProperties: false
+      required: [response]
+      properties:
+        response: { type: string, minLength: 1, maxLength: 2048, description: "Proof of the second factor (type is TC-9). Never logged." }
+
+    ChallengeAccepted:
+      type: object
+      additionalProperties: false
+      required: [challengeId, expiresAt, resendAvailableAt]
+      properties:
+        challengeId: { type: string, format: uuid, description: "Always present; a decoy when no code was sent." }
+        expiresAt: { type: string, format: date-time }
+        resendAvailableAt: { type: string, format: date-time }
+    SessionGranted:
+      type: object
+      additionalProperties: false
+      required: [tokenType, accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt, session, user]
+      properties:
+        tokenType: { type: string, enum: [Bearer] }
+        accessToken: { type: string, description: "Secret. Never logged." }
+        accessTokenExpiresAt: { type: string, format: date-time }
+        refreshToken: { type: string, description: "Secret. Single use. Never logged." }
+        refreshTokenExpiresAt: { type: string, format: date-time }
+        session: { $ref: '#/components/schemas/SessionSummary' }
+        user: { $ref: '#/components/schemas/CurrentUser' }
+    SessionSummary:
+      type: object
+      additionalProperties: false
+      required: [id, issuedAt, expiresAt, accessScope]
+      properties:
+        id: { type: string, format: uuid }
+        issuedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        accessScope:
+          type: string
+          enum: [FULL, SOS_ONLY]
+          description: "SOS_ONLY applies to a SUSPENDED account (FD-3)."
+    MaskedIdentifier:
+      type: object
+      additionalProperties: false
+      required: [id, type, maskedValue, verified, primary]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [PHONE, EMAIL] }
+        maskedValue: { type: string, maxLength: 254, description: "For example +234******001 or a***@example.test." }
+        verified: { type: boolean }
+        primary: { type: boolean }
+    IdentifierList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 10
+          items: { $ref: '#/components/schemas/MaskedIdentifier' }
+    CurrentUser:
+      type: object
+      additionalProperties: false
+      required: [id, displayName, accountStatus, createdAt, identifiers]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string }
+        accountStatus: { type: string, enum: [ACTIVE, SUSPENDED] }
+        createdAt: { type: string, format: date-time }
+        identifiers:
+          type: array
+          maxItems: 10
+          items: { $ref: '#/components/schemas/MaskedIdentifier' }
+    StaffPreMfaState:
+      type: object
+      additionalProperties: false
+      required: [state, expiresAt, csrfToken]
+      properties:
+        state: { type: string, enum: [MFA_REQUIRED] }
+        expiresAt: { type: string, format: date-time }
+        csrfToken: { type: string, description: "Needed for the second-factor operation." }
+    StaffSession:
+      type: object
+      additionalProperties: false
+      required: [userId, displayName, roles, sessionExpiresAt, mfaVerifiedAt, csrfToken]
+      properties:
+        userId: { type: string, format: uuid }
+        displayName: { type: string }
+        roles:
+          type: array
+          description: "ACTIVE profiles only. A person may hold several."
+          items: { type: string, enum: [OPERATOR, SUPERVISOR, ADMIN] }
+          uniqueItems: true
+        sessionExpiresAt: { type: string, format: date-time }
+        mfaVerifiedAt: { type: string, format: date-time }
+        csrfToken: { type: string, description: "Send as X-CSRF-Token on every state-changing request." }
